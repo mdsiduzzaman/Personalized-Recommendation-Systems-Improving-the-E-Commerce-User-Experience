@@ -1,0 +1,4 @@
+python -m venv env
+.\env\Scripts\activate
+
+pip install Flask numpy pandas scikit-learn jupyter matplotlib seaborn scipy flask-sqlalchemy mysqlclient
