@@ -8,7 +8,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 app = Flask(__name__)
 
 # Load files ==========================================================================================
-
 try:
     trending_products = pd.read_csv("models/trending_products.csv")
     train_data = pd.read_csv("models/clean_data.csv")
@@ -18,7 +17,7 @@ except Exception as e:
 
 # Database Configuration -------------------------------------------------------------------------------
 app.secret_key = "alskdjfwoeieiurlskdjfslkdjf"
-app.config['SQLALCHEMY_DATABASE_URI'] = "mysql://root:@localhost/ecom"
+app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://root:@localhost/ecom"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -35,6 +34,7 @@ class Signin(db.Model):
     password = db.Column(db.String(100), nullable=False)
 
 # Recommendations Functions ============================================================================
+
 def truncate(text, length):
     return text[:length] + "..." if len(text) > length else text
 
@@ -65,6 +65,7 @@ def content_based_recommendations(train_data, item_name, top_n=10):
     return recommended_items
 
 # Routes ==============================================================================================
+
 random_image_urls = [
     "static/img/img_1.png", "static/img/img_2.png", "static/img/img_3.png",
     "static/img/img_4.png", "static/img/img_5.png", "static/img/img_6.png"
@@ -72,23 +73,20 @@ random_image_urls = [
 
 @app.route("/")
 def index():
-    random_product_image_urls = [random.choice(random_image_urls) for _ in range(len(trending_products))]
+    random_product_image_urls = [random.choice(random_image_urls) for _ in range(len(trending_products.head(8)))]
     price = [40, 50, 60, 70, 100, 122, 106, 50, 30, 50]
     return render_template('index.html', trending_products=trending_products.head(8), truncate=truncate,
                            random_product_image_urls=random_product_image_urls, random_price=random.choice(price))
 
 @app.route("/main")
 def main():
-    random_product_image_urls = [random.choice(random_image_urls) for _ in range(len(train_data))]
+    random_product_image_urls = [random.choice(random_image_urls) for _ in range(len(train_data.head(8)))]
     price = [40, 50, 60, 70, 100, 122, 106, 50, 30, 50]
 
-    # Select only the necessary columns (modify if needed)
     products = train_data[['Name', 'ReviewCount', 'Brand', 'ImageURL', 'Rating']].head(8)
 
     return render_template('main.html', trending_products=products, truncate=truncate,
                            random_product_image_urls=random_product_image_urls, random_price=random.choice(price))
-
-
 
 @app.route("/signup", methods=['POST', 'GET'])
 def signup():
@@ -96,27 +94,46 @@ def signup():
         username = request.form['username']
         email = request.form['email']
         password = request.form['password']
+
+        random_product_image_urls = [random.choice(random_image_urls) for _ in range(len(train_data.head(8)))]
+        price = [40, 50, 60, 70, 100, 122, 106, 50, 30, 50]
+
+        products = train_data[['Name', 'ReviewCount', 'Brand', 'ImageURL', 'Rating']].head(8)
         
         if Signup.query.filter_by(email=email).first():
-            return render_template('index.html', signup_message="❌ Email already exists!")
-
+            return render_template('index.html', signup_message="❌ Email already exists!",trending_products=products, truncate=truncate,
+                               random_product_image_urls=random_product_image_urls, random_price=random.choice(price))
+        
         new_signup = Signup(username=username, email=email, password=password)
         db.session.add(new_signup)
         db.session.commit()
 
-        return render_template('index.html', signup_message="✅ User signed up successfully!")
+        
+
+        return render_template('index.html', signup_message="✅ User signed up successfully!", 
+                               trending_products=products, truncate=truncate,
+                               random_product_image_urls=random_product_image_urls, random_price=random.choice(price))
 
 @app.route("/signin", methods=['POST', 'GET'])
 def signin():
+    random_product_image_urls = [random.choice(random_image_urls) for _ in range(len(train_data.head(8)))]
+    price = [40, 50, 60, 70, 100, 122, 106, 50, 30, 50]
+
+    products = train_data[['Name', 'ReviewCount', 'Brand', 'ImageURL', 'Rating']].head(8)
+
     if request.method == 'POST':
         username = request.form['signinUsername']
         password = request.form['signinPassword']
 
         user = Signin.query.filter_by(username=username, password=password).first()
         if not user:
-            return render_template('index.html', signin_message="❌ Invalid login credentials!")
-
-        return render_template('index.html', signin_message="✅ User signed in successfully!")
+            return render_template('index.html', signin_message="❌ Invalid login credentials!",
+                                   trending_products=products, truncate=truncate,
+                                   random_product_image_urls=random_product_image_urls, random_price=random.choice(price))
+        
+        return render_template('index.html', signin_message="✅ User signed in successfully!", 
+                               trending_products=products, truncate=truncate,
+                               random_product_image_urls=random_product_image_urls, random_price=random.choice(price))
 
 @app.route("/recommendations", methods=['POST', 'GET'])
 def recommendations():
@@ -135,20 +152,15 @@ def recommendations():
         except ValueError:
             return render_template('main.html', message="⚠️ Please enter a valid number.")
 
-        first_word = prod.split()[0] if prod else ""
+        filtered_products = train_data[train_data['Name'].str.contains(prod, case=False, na=False)].head(nbr)
 
-        filtered_products = train_data[train_data['Name'].str.lower().str.startswith(first_word.lower(), na=False)]
-
-        recommendations = filtered_products.head(nbr)
-
-        if recommendations.empty:
+        if filtered_products.empty:
             return render_template('main.html', message="⚠️ No matching products found.")
 
-
-        random_product_image_urls = [random.choice(random_image_urls) for _ in range(len(train_data))]
+        random_product_image_urls = [random.choice(random_image_urls) for _ in range(len(filtered_products))]
         price = [40, 50, 60, 70, 100, 122, 106, 50, 30, 50]
 
-        return render_template('main.html', trending_products=recommendations, truncate=truncate,
+        return render_template('main.html', trending_products=filtered_products, truncate=truncate,
                                random_product_image_urls=random_product_image_urls, random_price=random.choice(price))
 
 if __name__ == '__main__':
