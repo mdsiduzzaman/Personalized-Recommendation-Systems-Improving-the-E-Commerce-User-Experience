@@ -144,18 +144,26 @@ def recommendations():
         print(f"🛒 Received product: {prod}")
         print(f"🔢 Number of recommendations requested: {nbr}")
 
+        random_product_image_urls = [random.choice(random_image_urls) for _ in range(len(train_data.head(8)))]
+        price = [40, 50, 60, 70, 100, 122, 106, 50, 30, 50]
+
+        products = train_data[['Name', 'ReviewCount', 'Brand', 'ImageURL', 'Rating']].head(8)
+
         if not prod or not nbr:
-            return render_template('main.html', message="⚠️ Please enter valid inputs.")
+            return render_template('main.html', message="⚠️ Please enter valid inputs.",trending_products=products, truncate=truncate,
+                                   random_product_image_urls=random_product_image_urls, random_price=random.choice(price))
 
         try:
             nbr = int(nbr)
         except ValueError:
-            return render_template('main.html', message="⚠️ Please enter a valid number.")
+            return render_template('main.html', message="⚠️ Please enter a valid number.",trending_products=products, truncate=truncate,
+                                   random_product_image_urls=random_product_image_urls, random_price=random.choice(price))
 
         filtered_products = train_data[train_data['Name'].str.contains(prod, case=False, na=False)].head(nbr)
 
         if filtered_products.empty:
-            return render_template('main.html', message="⚠️ No matching products found.")
+            return render_template('main.html', message="⚠️ No matching products found.",trending_products=products, truncate=truncate,
+                                   random_product_image_urls=random_product_image_urls, random_price=random.choice(price))
 
         random_product_image_urls = [random.choice(random_image_urls) for _ in range(len(filtered_products))]
         price = [40, 50, 60, 70, 100, 122, 106, 50, 30, 50]
